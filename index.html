@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Code Data Charts</title>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- ExcelJS & FileSaver for Excel export with images -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.7);
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-color);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--container-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .input-section {
+            margin-bottom: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-color);
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn {
+            align-self: flex-start;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 14px 0 var(--primary-glow);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 var(--primary-glow);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            display: none;
+            /* Hidden until data is loaded */
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .dashboard.visible {
+            display: grid;
+            opacity: 1;
+        }
+
+        .chart-card {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .chart-card h2 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #cbd5e1;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            width: 100%;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .summary-stats {
+            grid-column: span 2;
+            display: flex;
+            justify-content: space-around;
+            padding: 1.5rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .stat-item h3 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-item p {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #error-msg {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: none;
+            margin-top: 1rem;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-stats {
+                grid-column: 1;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>Product Code Analytics</h1>
+        <p class="subtitle">Paste your raw data below to generate beautiful, interactive statistics.</p>
+    </div>
+
+    <div class="container">
+        <div class="input-section">
+            <textarea id="data-input" placeholder="Paste your data here... Example:
+43712   94113501577   146
+43714   94412246511   198
+(...)"></textarea>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <button class="btn" onclick="processData()">Generate Analysis & Charts</button>
+                <button class="btn" id="export-excel-btn" onclick="exportToExcel()"
+                    style="display: none; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.4);">Export
+                    to Excel</button>
+            </div>
+            <div id="error-msg"></div>
+        </div>
+
+        <div class="dashboard" id="dashboard">
+            <div class="summary-stats">
+                <div class="stat-item">
+                    <h3>Total Rows Processed</h3>
+                    <p id="total-rows">0</p>
+                </div>
+                <div class="stat-item">
+                    <h3>Unique Product Codes</h3>
+                    <p id="unique-codes">0</p>
+                </div>
+                <div class="stat-item">
+                    <h3>Total Accumulated Amount</h3>
+                    <p id="total-amount">$0</p>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2>Total Counts by Product Code</h2>
+                <div class="chart-container">
+                    <canvas id="countChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h2>Total Amount by Product Code</h2>
+                <div class="chart-container">
+                    <canvas id="amountChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let countChartInstance = null;
+        let amountChartInstance = null;
+        let globalProcessedData = [];
+
+        // Plugin to add background color to charts (so transparent PNGs don't look bad in Excel)
+        const customCanvasBackgroundColor = {
+            id: 'customCanvasBackgroundColor',
+            beforeDraw: (chart, args, options) => {
+                const { ctx } = chart;
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.fillStyle = options.color || '#1e293b';
+                ctx.fillRect(0, 0, chart.width, chart.height);
+                ctx.restore();
+            }
+        };
+        Chart.register(customCanvasBackgroundColor);
+
+        // Beautiful color palettes
+        const colors = [
+            'rgba(59, 130, 246, 0.8)',   // Blue
+            'rgba(139, 92, 246, 0.8)',   // Violet
+            'rgba(236, 72, 153, 0.8)',   // Pink
+            'rgba(16, 185, 129, 0.8)',   // Emerald
+            'rgba(245, 158, 11, 0.8)',   // Orange
+            'rgba(14, 165, 233, 0.8)',   // Sky
+            'rgba(244, 63, 94, 0.8)',    // Rose
+            'rgba(168, 85, 247, 0.8)',   // Purple
+            'rgba(34, 197, 94, 0.8)',    // Green
+            'rgba(234, 179, 8, 0.8)'     // Amber
+        ];
+
+        const borderColors = colors.map(c => c.replace('0.8', '1'));
+
+        function processData() {
+            const rawData = document.getElementById('data-input').value.trim();
+            const errorMsg = document.getElementById('error-msg');
+            const dashboard = document.getElementById('dashboard');
+
+            if (!rawData) {
+                errorMsg.textContent = "Please paste some data first.";
+                errorMsg.style.display = "block";
+                return;
+            }
+
+            errorMsg.style.display = "none";
+
+            const lines = rawData.split('\n');
+            const counts = {};
+            const amounts = {};
+
+            let validRows = 0;
+            let totalAmountSum = 0;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // Skip header row if exists
+                if (line.toLowerCase().includes('productcode')) continue;
+
+                // Split by any whitespace (tabs or spaces)
+                const parts = line.split(/\s+/);
+
+                // We expect at least productCode, bbid, amount. 
+                // Sometimes formats might vary slightly, but generally we need first and last element if it's 3 items.
+                if (parts.length >= 3) {
+                    const productCode = parts[0];
+                    // The amount is the last part
+                    const amountStr = parts[parts.length - 1];
+                    const amount = parseFloat(amountStr);
+
+                    if (!isNaN(amount)) {
+                        counts[productCode] = (counts[productCode] || 0) + 1;
+                        amounts[productCode] = (amounts[productCode] || 0) + amount;
+                        validRows++;
+                        totalAmountSum += amount;
+                    }
+                }
+            }
+
+            if (validRows === 0) {
+                errorMsg.textContent = "Could not parse any valid data. Ensure format is: [ProductCode] [BBID] [Amount]";
+                errorMsg.style.display = "block";
+                return;
+            }
+
+            // Store summary data for Excel Export
+            globalProcessedData = Object.keys(counts).map(code => ({
+                'Product Code': code,
+                'Total Count': counts[code],
+                'Total Amount': amounts[code]
+            })).sort((a, b) => b['Total Count'] - a['Total Count']);
+
+            // Prepare data for Chart.js
+            const labels = Object.keys(counts).sort((a, b) => counts[b] - counts[a]); // Sort by count descending
+            const countData = labels.map(label => counts[label]);
+            const amountData = labels.map(label => amounts[label]);
+
+            // Update stats
+            document.getElementById('total-rows').textContent = validRows.toLocaleString();
+            document.getElementById('unique-codes').textContent = labels.length.toLocaleString();
+            document.getElementById('total-amount').textContent = totalAmountSum.toLocaleString();
+
+            // Render Charts
+            renderCharts(labels, countData, amountData);
+
+            // Show dashboard
+            dashboard.classList.add('visible');
+            document.getElementById('export-excel-btn').style.display = 'block';
+        }
+
+        async function exportToExcel() {
+            if (globalProcessedData.length === 0) return;
+
+            // Create a new workbook
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet("Product Analysis");
+
+            // Add headers
+            ws.columns = [
+                { header: 'Product Code', key: 'code', width: 20 },
+                { header: 'Total Count', key: 'count', width: 15 },
+                { header: 'Total Amount', key: 'amount', width: 20 }
+            ];
+
+            // Make headers bold
+            ws.getRow(1).font = { bold: true };
+
+            // Add rows
+            globalProcessedData.forEach(item => {
+                ws.addRow({
+                    code: item['Product Code'],
+                    count: item['Total Count'],
+                    amount: item['Total Amount']
+                });
+            });
+
+            try {
+                // Get charts as base64 images
+                // The charts have a dark background applied via plugin, keeping them visually consistent
+                const countChartDataUrl = document.getElementById('countChart').toDataURL('image/png');
+                const amountChartDataUrl = document.getElementById('amountChart').toDataURL('image/png');
+
+                const imageId1 = wb.addImage({
+                    base64: countChartDataUrl,
+                    extension: 'png',
+                });
+
+                const imageId2 = wb.addImage({
+                    base64: amountChartDataUrl,
+                    extension: 'png',
+                });
+
+                // Position the first chart starting at row 1, column E (index 4)
+                ws.addImage(imageId1, {
+                    tl: { col: 4, row: 1 },
+                    ext: { width: 500, height: 300 }
+                });
+
+                // Position the second chart starting at row 1, column M (index 12)
+                ws.addImage(imageId2, {
+                    tl: { col: 12, row: 1 },
+                    ext: { width: 500, height: 300 }
+                });
+            } catch (error) {
+                console.error("Error embedding charts:", error);
+            }
+
+            // Export to blob and trigger download
+            const buffer = await wb.xlsx.writeBuffer();
+            saveAs(new Blob([buffer]), "Product_Code_Analytics.xlsx");
+        }
+
+        function renderCharts(labels, countData, amountData) {
+            // Chart Defaults for dark mode
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            // Count Chart
+            const ctxCount = document.getElementById('countChart').getContext('2d');
+            if (countChartInstance) countChartInstance.destroy();
+
+            countChartInstance = new Chart(ctxCount, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Counts',
+                        data: countData,
+                        backgroundColor: colors.slice(0, labels.length).concat(Array(Math.max(0, labels.length - colors.length)).fill(colors[0])),
+                        borderColor: borderColors.slice(0, labels.length).concat(Array(Math.max(0, labels.length - borderColors.length)).fill(borderColors[0])),
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            title: { display: true, text: 'Frequency', color: '#cbd5e1' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            title: { display: true, text: 'Product Code', color: '#cbd5e1' }
+                        }
+                    },
+                    animation: {
+                        delay: (context) => context.dataIndex * 100 // Staggered animation
+                    }
+                }
+            });
+
+            // Amount Chart
+            const ctxAmount = document.getElementById('amountChart').getContext('2d');
+            if (amountChartInstance) amountChartInstance.destroy();
+
+            amountChartInstance = new Chart(ctxAmount, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Amount',
+                        data: amountData,
+                        backgroundColor: colors,
+                        borderColor: 'rgba(15, 23, 42, 1)',
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                padding: 20,
+                                font: { size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += new Intl.NumberFormat('en-US').format(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
